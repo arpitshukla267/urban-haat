@@ -11,9 +11,16 @@ const sans = Manrope({
 export const metadata: Metadata = {
   title: "Urban Haat",
   description: "Your neighbourhood market, now a tap away.",
+  icons: {
+    icon: "/icon.png",
+  },
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default function RootLayout({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   return (
     <html lang="en" className={sans.variable}>
       <body className="overflow-x-hidden font-[family-name:var(--font-sans)] text-stone-900 antialiased">
