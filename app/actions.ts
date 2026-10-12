@@ -3,13 +3,14 @@
 import { MongoClient } from "mongodb";
 import { randomBytes } from "crypto";
 
-const INTERESTS = [
+const INTERESTS = [ 
  " THE FUN FACTORY",
  " URBAN FOOD COURT",
  " HANDCRAFT MEET",
  " JHANSI HERITAGE",
  " GO KARTING",
  " URBAN PUNJAB",
+ " ABOVE ALL"
 ];
 
 /* ---- MongoDB connection (reused between requests) ---- */

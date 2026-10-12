@@ -12,6 +12,7 @@ const INTERESTS = [
   " JHANSI HERITAGE",
   " GO KARTING",
   " URBAN PUNJAB",
+  " ABOVE ALL"
 ];
 
 type Ticket = { id: string; name: string; interest: string; url: string; issuedAt?: number };
@@ -235,7 +236,7 @@ function ReceiptView({ ticket, isPrint = false }: { ticket: Ticket; isPrint?: bo
       </div>
 
       {/* Footer — Logos with links */}
-      <div className="mt-7 flex items-center justify-center gap-6">
+      {/* <div className="mt-7 flex items-center justify-center gap-6">
         <a href="https://visitinglink.com" target="_blank" rel="noopener noreferrer">
           <Image
             src="/vl.png"
@@ -254,7 +255,7 @@ function ReceiptView({ ticket, isPrint = false }: { ticket: Ticket; isPrint?: bo
             className="h-12 w-auto object-contain transition hover:opacity-80"
           />
         </a>
-      </div>
+      </div> */}
     </div>
   );
 }
