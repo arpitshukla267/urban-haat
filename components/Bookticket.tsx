@@ -235,7 +235,7 @@ function ReceiptView({ ticket, isPrint = false }: { ticket: Ticket; isPrint?: bo
         </div>
       </div>
 
-      {/* Footer — Logos with links */}
+      {/* Footer Logos */}
       {/* <div className="mt-7 flex items-center justify-center gap-6">
         <a href="https://visitinglink.com" target="_blank" rel="noopener noreferrer">
           <Image
