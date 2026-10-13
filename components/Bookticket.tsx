@@ -2,7 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useRef, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { createTicket, verifyTicket } from "@/app/actions";
+import { createTicket } from "@/app/actions";
 
 const INTERESTS = [
   " THE FUN FACTORY",
@@ -23,15 +23,6 @@ type Ticket = {
   issuedAt?: number;
 };
 type Errors = Partial<Record<"name" | "phone" | "interest" | "form", string>>;
-// applied  = first scan, coupon just got used
-// used     = this coupon was already used before
-type VerifyState =
-  | { status: "loading" }
-  | { status: "invalid" }
-  | { status: "error" }
-  | { status: "applied" }
-  | { status: "used" };
-
 const inputBase =
   "w-full rounded-lg border bg-white px-4 py-3 text-base text-stone-900 placeholder:text-stone-400 outline-none transition focus:border-[#BF7B25] focus:ring-4 focus:ring-[#BF7B25]/15";
 
@@ -181,7 +172,7 @@ function WhatsAppIcon({ className = "size-5" }: { className?: string }) {
 
 const CW = 1148;
 const CH = 1370;
-const COUPON_BG = "/ticket.webp"; 
+const COUPON_BG = "/ticket.webp";
 
 const fieldText: React.CSSProperties = {
   position: "absolute",
@@ -422,115 +413,6 @@ function TicketCard({
   );
 }
 
-/* ---------- Popup shown when a ticket QR is scanned ---------- */
-function VerifyCard({
-  state,
-  onClose,
-}: {
-  state: VerifyState;
-  onClose: () => void;
-}) {
-  const applied = state.status === "applied";
-  const used = state.status === "used";
-  const loading = state.status === "loading";
-
-  return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
-    >
-      <style>{`
-        @keyframes uh-draw { to { stroke-dashoffset: 0; } }
-        @keyframes uh-pop { 0% { transform: scale(.85); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
-        @keyframes uh-fill { to { opacity: 1; } }
-        .uh-modal { animation: uh-pop .3s ease-out both; }
-        .uh-circle { stroke-dasharray: 1; stroke-dashoffset: 1; animation: uh-draw .8s ease-out .15s forwards; }
-        .uh-tick { stroke-dasharray: 1; stroke-dashoffset: 1; animation: uh-draw .5s ease-out .9s forwards; }
-        .uh-glow { opacity: 0; animation: uh-fill .5s ease-out .9s forwards; }
-      `}</style>
-
-      <div className="uh-modal w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]">
-        {loading ? (
-          <p className="py-10 text-stone-600">Checking coupon...</p>
-        ) : applied ? (
-          <>
-            <svg
-              viewBox="0 0 120 120"
-              className="mx-auto size-32"
-              fill="none"
-              aria-hidden="true"
-            >
-              <circle
-                className="uh-glow"
-                cx="60"
-                cy="60"
-                r="52"
-                fill="#16A34A"
-                fillOpacity="0.12"
-              />
-              <circle
-                className="uh-circle"
-                cx="60"
-                cy="60"
-                r="52"
-                stroke="#16A34A"
-                strokeWidth="6"
-                strokeLinecap="round"
-                pathLength={1}
-                transform="rotate(-90 60 60)"
-              />
-              <path
-                className="uh-tick"
-                d="M38 62 L54 78 L83 44"
-                stroke="#16A34A"
-                strokeWidth="8"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                pathLength={1}
-              />
-            </svg>
-            <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-emerald-700">
-              Your coupon has been applied successfully
-            </h3>
-          </>
-        ) : used ? (
-          <>
-            <div className="mx-auto grid size-24 place-items-center rounded-full bg-red-100 text-5xl font-extrabold text-red-600">
-              !
-            </div>
-            <h3 className="mt-5 text-2xl font-extrabold tracking-tight text-red-700">
-              This coupon has already been used
-            </h3>
-          </>
-        ) : (
-          <>
-            <div className="mx-auto grid size-24 place-items-center rounded-full bg-red-100 text-5xl font-extrabold text-red-600">
-              ✕
-            </div>
-            <h3 className="mt-5 text-2xl font-extrabold tracking-tight">
-              {state.status === "error" ? "Couldn't check" : "Invalid coupon"}
-            </h3>
-            <p className="mt-1 text-stone-600">
-              {state.status === "error"
-                ? "Please check your connection and scan again."
-                : "We couldn't find this coupon. It may be fake or edited."}
-            </p>
-          </>
-        )}
-
-        <button
-          type="button"
-          onClick={onClose}
-          className="mt-7 w-full rounded-lg border border-stone-300 bg-white px-5 py-3 font-semibold text-stone-800 transition hover:bg-stone-50 focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#BF7B25]/25"
-        >
-          Book a ticket
-        </button>
-      </div>
-    </div>
-  );
-}
-
 /* ---------- Section ---------- */
 export default function BookTicket() {
   const [name, setName] = useState("");
@@ -540,34 +422,12 @@ export default function BookTicket() {
   const [errors, setErrors] = useState<Errors>({});
   const [loading, setLoading] = useState(false);
   const [ticket, setTicket] = useState<Ticket | null>(null);
-  const [verify, setVerify] = useState<VerifyState | null>(null);
 
-  // If the page was opened by scanning a ticket QR (?t=UH-...), verify it.
-  // The ref makes sure the scan is counted only once (React dev mode runs effects twice).
-  const scanned = useRef(false);
+  // Old tickets had their QR pointing at /?t=...; send those to the new verify page.
   useEffect(() => {
-    if (scanned.current) return;
     const t = new URLSearchParams(window.location.search).get("t");
-    if (!t) return;
-    scanned.current = true;
-    setVerify({ status: "loading" });
-    verifyTicket(t)
-      .then((r) =>
-        setVerify(
-          !r.valid
-            ? { status: "invalid" }
-            : r.alreadyUsed
-              ? { status: "used" }
-              : { status: "applied" },
-        ),
-      )
-      .catch(() => setVerify({ status: "error" }));
+    if (t) window.location.replace(`/verify?t=${encodeURIComponent(t)}`);
   }, []);
-
-  function closeVerify() {
-    window.history.replaceState(null, "", "/#tickets");
-    setVerify(null);
-  }
 
   function validate(): Errors {
     const e: Errors = {};
@@ -599,7 +459,7 @@ export default function BookTicket() {
           name: res.name,
           phone: phone.trim(),
           interest: res.interest,
-          url: `${base}/?t=${res.id}#tickets`,
+          url: `${base}/verify?t=${res.id}`,
           issuedAt: Date.now(),
         });
       }
@@ -751,8 +611,6 @@ export default function BookTicket() {
           )}
         </div>
       </div>
-
-      {verify && <VerifyCard state={verify} onClose={closeVerify} />}
     </section>
   );
 }

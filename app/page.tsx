@@ -2,13 +2,12 @@ import Hero from "@/components/Hero";
 import ImageCarousel from "@/components/ImageCarousel";
 import BookTicket from "@/components/Bookticket";
 import Footer from "@/components/Footer";
+import PageBackground from "@/components/PageBackground";
 
 export default function Home() {
   return (
-    <main
-      className="min-h-screen bg-cover bg-center bg-fixed bg-no-repeat"
-      style={{ backgroundImage: "url('/background.webp')" }}
-    >
+    <main className="min-h-screen">
+      <PageBackground />
       <Hero
         videos={[
           { src: "/v/1.mp4", poster: "/v/1.jpg" },
