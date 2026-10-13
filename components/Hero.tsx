@@ -365,7 +365,6 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
 }
 
 /* ---------- Handwriting "Coming Soon / This Navratri" ---------- */
-/* ---------- Handwriting "Coming Soon / This Navratri" ---------- */
 function WriteLine({
   text,
   run,
@@ -447,14 +446,14 @@ function ComingSoon() {
       />
 
       {/* This Navratri: starts the moment "Coming Soon" finishes */}
-      <div className="mt-2">
+      {/* <div className="mt-2">
         <WriteLine
           text="This Navratri"
           run={phase >= 2}
           duration={0.9}
           className="text-[clamp(1.75rem,5vw,2.75rem)] font-semibold leading-tight text-stone-800"
         />
-      </div>
+      </div> */}
     </div>
   );
 }

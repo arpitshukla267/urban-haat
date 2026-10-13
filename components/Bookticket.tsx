@@ -309,27 +309,28 @@ function TicketCard({
   onReset: () => void;
 }) {
   const printRef = useRef<HTMLDivElement>(null);
-  const [downloading, setDownloading] = useState(false);
-  const [pdfError, setPdfError] = useState("");
+  const [downloading, setDownloading] = useState<"pdf" | "image" | null>(null);
+  const [dlError, setDlError] = useState("");
 
-  // Takes a sharp picture of the full-size coupon and puts it on a PDF page of the same shape.
-  async function downloadPdf() {
+  // Takes a sharp picture of the full-size coupon (used for both PDF and image).
+  async function capture() {
     const node = printRef.current;
-    if (!node) return;
-    setDownloading(true);
-    setPdfError("");
+    if (!node) throw new Error("Coupon node not found");
+    const { toPng } = await import("html-to-image");
+    return toPng(node, {
+      pixelRatio: 2,
+      width: CW,
+      height: CH,
+      cacheBust: true,
+      skipFonts: false,
+    });
+  }
+
+  async function downloadPdf() {
+    setDownloading("pdf");
+    setDlError("");
     try {
-      const [{ toPng }, { jsPDF }] = await Promise.all([
-        import("html-to-image"),
-        import("jspdf"),
-      ]);
-      const png = await toPng(node, {
-        pixelRatio: 2,
-        width: CW,
-        height: CH,
-        cacheBust: true,
-        skipFonts: false,
-      });
+      const [png, { jsPDF }] = await Promise.all([capture(), import("jspdf")]);
       const pageW = 210;
       const pageH = (210 * CH) / CW;
       const pdf = new jsPDF({
@@ -341,15 +342,56 @@ function TicketCard({
       pdf.save(`Urban-Haat-Coupon-${ticket.id}.pdf`);
     } catch (err) {
       console.error("PDF download failed:", err);
-      setPdfError("Couldn't create the PDF. Please try again.");
+      setDlError(
+        "Couldn't create the PDF. Please take a screenshot of the ticket instead.",
+      );
     } finally {
-      setDownloading(false);
+      setDownloading(null);
     }
   }
 
+  async function downloadImage() {
+    setDownloading("image");
+    setDlError("");
+    try {
+      const png = await capture();
+      const a = document.createElement("a");
+      a.href = png;
+      a.download = `Urban-Haat-Coupon-${ticket.id}.png`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+    } catch (err) {
+      console.error("Image download failed:", err);
+      setDlError(
+        "Couldn't create the image. Please take a screenshot of the ticket instead.",
+      );
+    } finally {
+      setDownloading(null);
+    }
+  }
+
+  const dlBtn =
+    "flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3.5 font-bold shadow-lg transition focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#BF7B25]/30 disabled:cursor-not-allowed disabled:opacity-70";
+
+  const DownloadIcon = (
+    <svg
+      viewBox="0 0 24 24"
+      className="size-5"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2.2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16" />
+    </svg>
+  );
+
   return (
     <div className="mx-auto w-full max-w-sm sm:max-w-md">
-      {/* Off-screen full-size coupon that becomes the PDF */}
+      {/* Off-screen full-size coupon that becomes the PDF / image */}
       <div
         aria-hidden="true"
         className="pointer-events-none fixed top-0"
@@ -362,33 +404,46 @@ function TicketCard({
 
       <ScaledCoupon ticket={ticket} />
 
-      <button
-        type="button"
-        onClick={downloadPdf}
-        disabled={downloading}
-        className="mt-6 flex w-full items-center justify-center gap-2 rounded-xl bg-[#BF7B25] px-5 py-3.5 font-bold text-white shadow-lg transition hover:bg-[#A8681C] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#BF7B25]/30 disabled:cursor-not-allowed disabled:opacity-70"
-      >
-        <svg
-          viewBox="0 0 24 24"
-          className="size-5"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.2"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          aria-hidden="true"
-        >
-          <path d="M12 3v12m0 0l-4.5-4.5M12 15l4.5-4.5M4 20h16" />
-        </svg>
-        {downloading ? "Preparing PDF..." : "Download coupon (PDF)"}
-      </button>
+      {/* Notes */}
+      <div className="mt-4 space-y-1.5 rounded-xl border border-[#BF7B25]/30 bg-[#BF7B25]/10 px-4 py-3 text-sm text-stone-800">
+        <p>
+          <span className="font-semibold">Note:</span> If the ticket
+          fails to download, please take a screenshot.
+        </p>
+        <p>
+          <span className="font-semibold">Note:</span> Once the ticket is
+          scanned, the coupon becomes invalid.
+        </p>
+      </div>
 
-      {pdfError && (
+      {/* Download options */}
+      <div className="mt-4 grid grid-cols-2 gap-3">
+        <button
+          type="button"
+          onClick={downloadPdf}
+          disabled={downloading !== null}
+          className={`${dlBtn} bg-[#BF7B25] text-white hover:bg-[#A8681C]`}
+        >
+          {DownloadIcon}
+          {downloading === "pdf" ? "Preparing..." : "PDF"}
+        </button>
+        <button
+          type="button"
+          onClick={downloadImage}
+          disabled={downloading !== null}
+          className={`${dlBtn} border border-[#BF7B25] bg-white text-[#BF7B25] hover:bg-[#BF7B25]/10`}
+        >
+          {DownloadIcon}
+          {downloading === "image" ? "Preparing..." : "Image"}
+        </button>
+      </div>
+
+      {dlError && (
         <p
           role="alert"
           className="mt-3 rounded-lg bg-red-50 px-4 py-3 text-sm text-red-700"
         >
-          {pdfError}
+          {dlError}
         </p>
       )}
 
