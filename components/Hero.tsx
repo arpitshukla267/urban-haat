@@ -2,6 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
+import { Caveat } from "next/font/google";
+
+const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
 type VideoItem = {
   src?: string;
@@ -38,7 +41,12 @@ const PLACEHOLDERS: VideoItem[] = [];
 
 function Mark({ shape }: { shape: Shape }) {
   return (
-    <svg viewBox="0 0 24 24" className="size-6 flex-none sm:size-7" fill="currentColor" aria-hidden="true">
+    <svg
+      viewBox="0 0 24 24"
+      className="size-6 flex-none sm:size-7"
+      fill="currentColor"
+      aria-hidden="true"
+    >
       {shape === "circle" && <circle cx="12" cy="12" r="10" />}
       {shape === "square" && <rect x="2" y="2" width="20" height="20" rx="4" />}
       {shape === "triangle" && <path d="M12 2l10.5 19h-21z" />}
@@ -169,7 +177,9 @@ function VideoSlide({ item, index, registerVideo, onPlayStart }: SlideProps) {
               <div className="mx-auto grid size-16 place-items-center rounded-full bg-[#BF7B25] shadow-md">
                 <PlayIcon className="ml-1 size-6 fill-white" />
               </div>
-              <p className="mt-4 text-sm text-stone-600">{label} goes here (14:16)</p>
+              <p className="mt-4 text-sm text-stone-600">
+                {label} goes here (14:16)
+              </p>
             </div>
           </div>
         )}
@@ -187,9 +197,12 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
   const [active, setActive] = useState(0); // first visible slide
   const [maxIndex, setMaxIndex] = useState(0); // last position we can scroll to
 
-  const registerVideo = useCallback((i: number, el: HTMLVideoElement | null) => {
-    videoEls.current[i] = el;
-  }, []);
+  const registerVideo = useCallback(
+    (i: number, el: HTMLVideoElement | null) => {
+      videoEls.current[i] = el;
+    },
+    [],
+  );
 
   // Only one video plays at a time.
   const onPlayStart = useCallback((playingIndex: number) => {
@@ -216,7 +229,10 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
     const step = getStep();
     if (!el || !step) return;
     const idx = Math.round(el.scrollLeft / step);
-    const max = Math.max(0, Math.round((el.scrollWidth - el.clientWidth) / step));
+    const max = Math.max(
+      0,
+      Math.round((el.scrollWidth - el.clientWidth) / step),
+    );
     activeRef.current = idx;
     setActive(idx);
     setMaxIndex(max);
@@ -229,7 +245,7 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
       const next = Math.max(0, Math.min(maxIndex, i));
       el.scrollTo({ left: next * getStep(), behavior: "smooth" });
     },
-    [maxIndex, getStep]
+    [maxIndex, getStep],
   );
 
   // Any sliding (swipe, arrows, dots, trackpad) pauses the playing video.
@@ -348,13 +364,111 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
   );
 }
 
+/* ---------- Handwriting "Coming Soon / This Navratri" ---------- */
+/* ---------- Handwriting "Coming Soon / This Navratri" ---------- */
+function WriteLine({
+  text,
+  run,
+  duration,
+  onDone,
+  className,
+}: {
+  text: string;
+  run: boolean;
+  duration: number;
+  onDone?: () => void;
+  className: string;
+}) {
+  return (
+    <span
+      className={`${script.className} uh-write ${run ? "uh-run" : ""} block px-2 ${className}`}
+      style={{ animationDuration: `${duration}s` }}
+      onAnimationEnd={onDone}
+    >
+      {text}
+    </span>
+  );
+}
+
+function ComingSoon() {
+  const rootRef = useRef<HTMLDivElement>(null);
+  // 0 = waiting, 1 = writing "Coming Soon", 2 = writing "This Navratri"
+  const [phase, setPhase] = useState(0);
+
+  // Start when the block enters the viewport.
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    if (typeof IntersectionObserver === "undefined") {
+      setPhase(1);
+      return;
+    }
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          setPhase(1);
+          io.disconnect();
+        }
+      },
+      { threshold: 0.35 }
+    );
+    io.observe(el);
+    return () => io.disconnect();
+  }, []);
+
+  return (
+    <div ref={rootRef} className="mt-10 flex flex-col items-center sm:mt-12">
+      <style>{`
+        @keyframes uh-write {
+          from { clip-path: inset(-10% 100% -10% 0); }
+          to   { clip-path: inset(-10% -4% -10% 0); }
+        }
+        .uh-write {
+          clip-path: inset(-10% 100% -10% 0);
+        }
+        .uh-run {
+          animation-name: uh-write;
+          animation-timing-function: cubic-bezier(.4, .1, .5, 1);
+          animation-fill-mode: forwards;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .uh-write { clip-path: none; }
+          .uh-run { animation: none; }
+        }
+      `}</style>
+
+      {/* Coming Soon */}
+      <WriteLine
+        text="Coming Soon"
+        run={phase >= 1}
+        duration={1.1}
+        onDone={() => setPhase(2)}
+        className="text-[clamp(2.75rem,9vw,5rem)] font-bold leading-none text-[#BF7B25]"
+      />
+
+      {/* This Navratri: starts the moment "Coming Soon" finishes */}
+      <div className="mt-2">
+        <WriteLine
+          text="This Navratri"
+          run={phase >= 2}
+          duration={0.9}
+          className="text-[clamp(1.75rem,5vw,2.75rem)] font-semibold leading-tight text-stone-800"
+        />
+      </div>
+    </div>
+  );
+}
+
 /* ---------- Instagram Reel Video Component ---------- */
 function InstagramReelView() {
   const containerRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // Load Instagram embed script
-    if (typeof window !== "undefined" && !document.getElementById("ig-embed-script")) {
+    if (
+      typeof window !== "undefined" &&
+      !document.getElementById("ig-embed-script")
+    ) {
       const script = document.createElement("script");
       script.id = "ig-embed-script";
       script.src = "https://www.instagram.com/embed.js";
@@ -408,16 +522,24 @@ export default function Hero({ videoSrc, poster, videos }: HeroProps) {
     <header className="bg-transparent pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
       <div className="mx-auto flex max-w-[1100px] flex-col items-center px-4 pt-2 text-center sm:px-8 sm:pt-8">
         {/* Logo */}
-        <a href="#" aria-label="Urban Haat home" className="inline-flex items-center gap-3 -mb-6">
+        <a
+          href="#"
+          aria-label="Urban Haat home"
+          className="inline-flex items-center gap-3 -mb-6"
+        >
           <Image src="/logo.webp" alt="Urban Haat" width={200} height={100} />
         </a>
 
+        {/* Coming Soon — handwriting animation */}
+        <ComingSoon />
+
         {/* Tagline */}
-        <h1 className="mt-10 max-w-[18ch] text-[clamp(2.25rem,6.5vw,4.25rem)] font-extrabold leading-[1.08] tracking-tight text-stone-900 sm:mt-14">
+        <h1 className="mt-8 max-w-[18ch] text-[clamp(2.25rem,6.5vw,4.25rem)] font-extrabold leading-[1.08] tracking-tight text-stone-900 sm:mt-12">
           Fun, Food & Shopping — All in One Place.
         </h1>
         <p className="mt-5 max-w-[48ch] text-base leading-relaxed text-stone-600 sm:text-lg">
-          Your neighbourhood market, now a tap away. Craft, food and stories from the people who make them.
+          Your neighbourhood market, now a tap away. Craft, food and stories
+          from the people who make them.
         </p>
 
         {/* Video section - Instagram Reel in center */}
