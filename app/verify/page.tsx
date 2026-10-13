@@ -66,7 +66,12 @@ export default function VerifyPage() {
         className="uh-modal w-full max-w-sm rounded-3xl bg-white p-8 text-center shadow-[0_24px_60px_-20px_rgba(0,0,0,0.5)]"
       >
         {loading ? (
-          <p className="py-10 text-stone-600">Checking coupon...</p>
+          <div className="py-8">
+            <div className="mx-auto size-14 animate-spin rounded-full border-4 border-[#BF7B25]/20 border-t-[#BF7B25]" />
+            <p className="mt-5 font-semibold text-stone-700">
+              Verifying your coupon...
+            </p>
+          </div>
         ) : applied ? (
           <>
             <svg
