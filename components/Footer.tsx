@@ -1,9 +1,8 @@
 "use client";
 import Image from "next/image";
 
-// Change these to your real details
-const INSTAGRAM_URL = "https://www.instagram.com/urbanhaat"; // <- put your Instagram page link here
-const WHATSAPP_NUMBER = "919236553585"; // country code + number, no + or spaces
+const INSTAGRAM_URL = "https://www.instagram.com/urbanhaat_jhansi/"; 
+const WHATSAPP_NUMBER = "919236553585"; 
 const DISPLAY_NUMBER = "+91 92365 53585";
 const WHATSAPP_URL = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(
   "Hi Urban Haat, I need some help."
