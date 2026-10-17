@@ -154,7 +154,7 @@ export default function Imagebanners() {
             <div
               key={i}
               data-slide
-              className="uh-slide relative aspect-[4/5] overflow-hidden rounded-xl border border-[#BF7B25]/20 bg-[#BF7B25]/10 shadow-[0_16px_36px_-20px_rgba(120,80,20,0.5)]"
+              className="uh-slide relative aspect-[4/6] overflow-hidden rounded-xl border border-[#BF7B25]/20 bg-[#BF7B25]/10 shadow-[0_16px_36px_-20px_rgba(120,80,20,0.5)]"
             >
               {item.src ? (
                 <Image
