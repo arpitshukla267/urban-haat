@@ -92,7 +92,7 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
   const bgLoadedRef = useRef(false);
   const initialReadyRef = useRef(false);
   const bannersStartedRef = useRef(false);
-  const lastProgressRef = useRef(Date.now());
+  const lastProgressRef = useRef(0); // set in the mount effect (no Date.now() during render)
 
   const markLoaderGone = useCallback(() => setLoaderGone(true), []);
 
@@ -206,6 +206,7 @@ export function LoadingProvider({ children }: { children: React.ReactNode }) {
 
     // 2. Progress bar creeps toward 90% over the loader window
     const start = Date.now();
+    lastProgressRef.current = start;
     const tick = setInterval(() => {
       const t = Math.min(1, (Date.now() - start) / LOADER_MAX_MS);
       setProgress((p) => Math.max(p, Math.round(t * 90)));
