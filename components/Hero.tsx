@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { Caveat } from "next/font/google";
+import { useLoading } from "./LoadingContext";
 
 const script = Caveat({ subsets: ["latin"], weight: ["600", "700"] });
 
@@ -289,7 +290,7 @@ function VideoSlider({ videos }: { videos: VideoItem[] }) {
   const atEnd = active >= maxIndex;
 
   const arrowBase =
-    "absolute top-[calc(50%_-_0.75rem)] z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/90 text-[#BF7B25] shadow-md backdrop-blur transition hover:bg-[#BF7B25] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#BF7B25] disabled:pointer-events-none disabled:opacity-0";
+    "absolute top-[calc(50%_-_0.75rem)] z-10 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/90 text-[#BF7B25] shadow-md backdrop-blur transition hover:bg-[#BF7B25] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#BF7B25] disabled:pointer-events-none disabled:opacity-50";
 
   return (
     <div
@@ -389,31 +390,32 @@ function WriteLine({
   );
 }
 
-function ComingSoon() {
+function ComingSoon({ ready }: { ready: boolean }) {
   const rootRef = useRef<HTMLDivElement>(null);
   // 0 = waiting, 1 = writing "Coming Soon", 2 = writing "This Navratri"
   const [phase, setPhase] = useState(0);
 
-  // Start when the block enters the viewport.
+  // Start only when the page loader is gone AND the block is in the viewport.
   useEffect(() => {
+    if (!ready) return;
     const el = rootRef.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
-      setPhase(1);
+      setPhase((p) => (p === 0 ? 1 : p));
       return;
     }
     const io = new IntersectionObserver(
       ([entry]) => {
         if (entry.isIntersecting) {
-          setPhase(1);
+          setPhase((p) => (p === 0 ? 1 : p));
           io.disconnect();
         }
       },
-      { threshold: 0.35 }
+      { threshold: 0.35 },
     );
     io.observe(el);
     return () => io.disconnect();
-  }, []);
+  }, [ready]);
 
   return (
     <div ref={rootRef} className="mt-10 flex flex-col items-center sm:mt-12">
@@ -459,184 +461,279 @@ function ComingSoon() {
 }
 
 /* ---------- Instagram Reel Carousel Component ---------- */
-const REEL_IDS = [
-  "DeZGuqASYJU",
-  "DelWfMDKqrX",
-  "Dej_99rKRD7",
-  "DegiS-gq2wy",
-];
+const REEL_IDS = ["DeZGuqASYJU", "DelWfMDKqrX", "Dej_99rKRD7", "DegiS-gq2wy"];
+
+function ReelPlaceholder() {
+  return (
+    <div className="pointer-events-none absolute inset-0 flex animate-pulse flex-col items-center justify-center p-6 text-center">
+      <div className="mb-3 grid size-14 place-items-center rounded-full bg-[#BF7B25]/20 text-[#BF7B25]">
+        <PlayIcon className="ml-1 size-6 fill-current" />
+      </div>
+      <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">
+        Loading reel...
+      </span>
+    </div>
+  );
+}
+
+// Remounted (via key) whenever the reel is "paused", so `loaded` resets itself.
+function ReelFrame({ id, onLoaded }: { id: string; onLoaded: () => void }) {
+  const [loaded, setLoaded] = useState(false);
+  const [attempt, setAttempt] = useState(0);
+
+  // Instagram embeds sometimes stall: if this one has not loaded after 4 s,
+  // remount the iframe and try again (up to 2 retries).
+  useEffect(() => {
+    if (loaded || attempt >= 2) return;
+    const t = setTimeout(() => setAttempt((a) => a + 1), 4000);
+    return () => clearTimeout(t);
+  }, [loaded, attempt]);
+
+  return (
+    <>
+      <iframe
+        key={attempt}
+        src={`https://www.instagram.com/reel/${id}/embed`}
+        title={`Instagram reel ${id}`}
+        loading="eager"
+        onLoad={() => {
+          setLoaded(true);
+          onLoaded();
+        }}
+        allow="autoplay; encrypted-media; fullscreen"
+        scrolling="no"
+        className={`absolute border-0 transition-opacity duration-300 ${
+          loaded ? "opacity-100" : "opacity-0"
+        }`}
+        style={{
+          width: 450,
+          height: 920,
+          left: -86,
+          top: -64,
+          transform: "scale(1.146)",
+          transformOrigin: "top left",
+        }}
+      />
+      {!loaded && <ReelPlaceholder />}
+    </>
+  );
+}
 
 function ReelCard({
   id,
-  isActive,
-  onActivate,
-  scrollerRef,
+  shouldLoad,
+  onLoaded,
+  reloadKey,
 }: {
   id: string;
-  isActive: boolean;
-  onActivate: () => void;
-  scrollerRef: React.RefObject<HTMLDivElement | null>;
+  shouldLoad: boolean;
+  onLoaded: () => void;
+  reloadKey: number;
 }) {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const iframeRef = useRef<HTMLIFrameElement>(null);
-  const [reloadKey, setReloadKey] = useState(0);
-
-  // If this card is no longer active, refresh the iframe to stop video playback
-  useEffect(() => {
-    if (!isActive) {
-      setReloadKey((k) => k + 1);
-    }
-  }, [isActive]);
-
-  // When card moves out of the scroller viewport or page viewport, automatically pause it
-  useEffect(() => {
-    const cardEl = cardRef.current;
-    const scrollerEl = scrollerRef.current;
-    if (!cardEl || !isActive) return;
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach((entry) => {
-          // If less than 40% of the active video is visible in the carousel/viewport, pause it
-          if (entry.intersectionRatio < 0.4) {
-            setReloadKey((k) => k + 1);
-          }
-        });
-      },
-      {
-        root: scrollerEl,
-        threshold: [0, 0.4, 0.8, 1.0],
-      }
-    );
-
-    observer.observe(cardEl);
-    return () => observer.disconnect();
-  }, [isActive, scrollerRef]);
-
   return (
     <div
-      ref={cardRef}
-      onClick={onActivate}
-      className="w-[85vw] max-w-[340px] flex-none snap-center sm:w-[320px] lg:w-[340px]"
+      className="w-full flex-none snap-center"
+      style={{ contain: "layout paint" }}
+      data-reel-id={id}
     >
       <div
-        className="relative w-full overflow-hidden rounded-2xl bg-black border border-[#BF7B25]/20 shadow-[0_20px_50px_-20px_rgba(191,123,37,0.3)]"
+        className="relative w-full select-none overflow-hidden rounded-2xl border border-[#BF7B25]/20 bg-[#BF7B25]/10 shadow-[0_20px_50px_-20px_rgba(191,123,37,0.3)]"
         style={{ aspectRatio: "9 / 16" }}
       >
-        <iframe
-          key={reloadKey}
-          ref={iframeRef}
-          src={`https://www.instagram.com/reel/${id}/embed`}
-          title={`Instagram reel ${id}`}
-          loading="lazy"
-          allow="autoplay; encrypted-media; fullscreen"
-          scrolling="no"
-          className="absolute border-0"
-          style={{
-            width: 450,
-            height: 920,
-            left: -86,
-            top: -64,
-            transform: "scale(1.146)",
-            transformOrigin: "top left",
-          }}
-        />
+        {shouldLoad ? (
+          <ReelFrame key={reloadKey} id={id} onLoaded={onLoaded} />
+        ) : (
+          <ReelPlaceholder />
+        )}
       </div>
     </div>
   );
 }
 
 function InstagramReelCarousel() {
+  const { reelsToLoad, markReelLoaded, unlockReels } = useLoading();
   const scrollerRef = useRef<HTMLDivElement>(null);
-  const [activeReelId, setActiveReelId] = useState<string | null>(null);
-  const [canScrollLeft, setCanScrollLeft] = useState(false);
-  const [canScrollRight, setCanScrollRight] = useState(true);
+  const activeIdxRef = useRef(0);
+  const [active, setActive] = useState(0);
 
-  const checkScroll = useCallback(() => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    setCanScrollLeft(el.scrollLeft > 10);
-    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+  // Bumping a reel's key remounts its iframe, which is the only way to stop a cross-origin embed.
+  const [reloadKeys, setReloadKeys] = useState<number[]>(() =>
+    REEL_IDS.map(() => 0),
+  );
+
+  // Index of the reel that is currently playing (null = none).
+  const activeReelRef = useRef<number | null>(null);
+
+  const pauseReel = useCallback((reelIndex: number) => {
+    setReloadKeys((prev) => {
+      const next = [...prev];
+      next[reelIndex] = prev[reelIndex] + 1;
+      return next;
+    });
   }, []);
 
-  useEffect(() => {
-    checkScroll();
-    window.addEventListener("resize", checkScroll);
-    return () => window.removeEventListener("resize", checkScroll);
-  }, [checkScroll]);
+  // Distance between two slides (width + gap).
+  const getStep = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el || el.children.length < 2) return el?.clientWidth ?? 0;
+    const a = el.children[0] as HTMLElement;
+    const b = el.children[1] as HTMLElement;
+    return b.offsetLeft - a.offsetLeft;
+  }, []);
 
-  // When window/page loses focus to an iframe, identify which reel was interacted with
+  const onScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    const step = getStep();
+    if (!el || !step) return;
+    const idx = Math.max(
+      0,
+      Math.min(REEL_IDS.length - 1, Math.round(el.scrollLeft / step)),
+    );
+    activeIdxRef.current = idx;
+    setActive(idx);
+    // make sure the reel you are on, and the next one, are fetching
+    unlockReels(idx + 2);
+  }, [getStep, unlockReels]);
+
+  const goTo = useCallback(
+    (i: number) => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      const next = Math.max(0, Math.min(REEL_IDS.length - 1, i));
+      unlockReels(next + 2);
+      el.scrollTo({ left: next * getStep(), behavior: "smooth" });
+    },
+    [getStep, unlockReels],
+  );
+
+  // Keep the current reel centred when the window is resized / rotated.
+  useEffect(() => {
+    const onResize = () => {
+      const el = scrollerRef.current;
+      if (!el) return;
+      el.scrollTo({ left: activeIdxRef.current * getStep() });
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, [getStep]);
+
+  // Detect which reel was tapped (focus moves from the page into a cross-origin iframe).
+  // Only the PREVIOUSLY playing reel is reloaded; all other reels are left alone.
   useEffect(() => {
     const onBlur = () => {
-      // Small timeout to check which element became active
       setTimeout(() => {
         const activeEl = document.activeElement;
-        if (activeEl && activeEl.tagName === "IFRAME") {
-          const src = (activeEl as HTMLIFrameElement).src || "";
-          for (const id of REEL_IDS) {
-            if (src.includes(id)) {
-              setActiveReelId(id);
-              break;
-            }
-          }
-        }
+        if (!activeEl || activeEl.tagName !== "IFRAME") return;
+
+        const src = (activeEl as HTMLIFrameElement).src || "";
+        const idx = REEL_IDS.findIndex((rid) => src.includes(rid));
+        if (idx === -1) return;
+
+        const prev = activeReelRef.current;
+        if (prev === idx) return; // same reel, nothing to do
+
+        activeReelRef.current = idx;
+        if (prev !== null) pauseReel(prev); // pause only the previous one
       }, 50);
     };
 
     window.addEventListener("blur", onBlur);
     return () => window.removeEventListener("blur", onBlur);
-  }, []);
+  }, [pauseReel]);
 
-  const scroll = (direction: "left" | "right") => {
-    const el = scrollerRef.current;
-    if (!el) return;
-    const distance = 350;
-    el.scrollBy({
-      left: direction === "left" ? -distance : distance,
-      behavior: "smooth",
-    });
-  };
+  // If the playing reel scrolls mostly out of view, pause it.
+  useEffect(() => {
+    const scrollerEl = scrollerRef.current;
+    if (!scrollerEl) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.intersectionRatio >= 0.4) return;
+          const reelId = (entry.target as HTMLElement).dataset.reelId;
+          const idx = reelId ? REEL_IDS.indexOf(reelId) : -1;
+          if (idx !== -1 && activeReelRef.current === idx) {
+            activeReelRef.current = null;
+            pauseReel(idx);
+          }
+        });
+      },
+      { root: scrollerEl, threshold: [0, 0.4] },
+    );
+
+    scrollerEl
+      .querySelectorAll<HTMLElement>("[data-reel-id]")
+      .forEach((card) => observer.observe(card));
+
+    return () => observer.disconnect();
+  }, [pauseReel]);
+
+  const atStart = active <= 0;
+  const atEnd = active >= REEL_IDS.length - 1;
+
+  const arrow =
+    "absolute top-1/2 z-20 grid size-10 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/95 text-[#BF7B25] shadow-lg backdrop-blur transition hover:bg-[#BF7B25] hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#BF7B25] disabled:pointer-events-none disabled:opacity-50 sm:size-11";
 
   return (
-    <div className="relative w-full max-w-[1200px] px-2 sm:px-8">
-      {/* Scroll Left Button */}
-      {canScrollLeft && (
-        <button
-          type="button"
-          onClick={() => scroll("left")}
-          aria-label="Previous reel"
-          className="absolute left-0 sm:left-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/95 text-[#BF7B25] shadow-lg backdrop-blur transition hover:bg-[#BF7B25] hover:text-white"
-        >
-          <Chevron dir="left" />
-        </button>
-      )}
+    <div
+      role="region"
+      aria-roledescription="carousel"
+      aria-label="Urban Haat reels"
+      className="relative w-[85vw] max-w-[340px]"
+    >
+      <button
+        type="button"
+        onClick={() => goTo(active - 1)}
+        disabled={atStart}
+        aria-label="Previous reel"
+        className={`${arrow} left-2 sm:-left-16`}
+      >
+        <Chevron dir="left" />
+      </button>
 
-      {/* Scroll Right Button */}
-      {canScrollRight && (
-        <button
-          type="button"
-          onClick={() => scroll("right")}
-          aria-label="Next reel"
-          className="absolute right-0 sm:right-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/95 text-[#BF7B25] shadow-lg backdrop-blur transition hover:bg-[#BF7B25] hover:text-white"
-        >
-          <Chevron dir="right" />
-        </button>
-      )}
+      <button
+        type="button"
+        onClick={() => goTo(active + 1)}
+        disabled={atEnd}
+        aria-label="Next reel"
+        className={`${arrow} right-2 sm:-right-16`}
+      >
+        <Chevron dir="right" />
+      </button>
 
-      {/* Carousel Track */}
+      {/* One reel visible at a time */}
       <div
         ref={scrollerRef}
-        onScroll={checkScroll}
-        className="flex snap-x snap-mandatory gap-5 sm:gap-6 overflow-x-auto overscroll-x-contain py-4 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        onScroll={onScroll}
+        className="flex snap-x snap-mandatory gap-4 overflow-x-auto overscroll-x-contain scroll-smooth py-4 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         style={{ WebkitOverflowScrolling: "touch" }}
       >
-        {REEL_IDS.map((id) => (
+        {REEL_IDS.map((id, index) => (
           <ReelCard
             key={id}
             id={id}
-            isActive={activeReelId === null || activeReelId === id}
-            onActivate={() => setActiveReelId(id)}
-            scrollerRef={scrollerRef}
+            // Reels load one at a time (see LoadingContext).
+            shouldLoad={index < reelsToLoad}
+            onLoaded={() => markReelLoaded(index)}
+            reloadKey={reloadKeys[index]}
+          />
+        ))}
+      </div>
+
+      {/* Position dots */}
+      <div className="mt-1 flex justify-center gap-2">
+        {REEL_IDS.map((id, i) => (
+          <button
+            key={id}
+            type="button"
+            aria-label={`Go to reel ${i + 1}`}
+            aria-current={i === active}
+            onClick={() => goTo(i)}
+            className={`h-2 rounded-full transition-all duration-300 ${
+              i === active
+                ? "w-6 bg-[#BF7B25]"
+                : "w-2 bg-[#BF7B25]/30 hover:bg-[#BF7B25]/60"
+            }`}
           />
         ))}
       </div>
@@ -645,11 +742,21 @@ function InstagramReelCarousel() {
 }
 
 export default function Hero({ videoSrc, poster, videos }: HeroProps) {
+  // true once the full-page loader has fully faded out
+  const { loaderGone } = useLoading();
   // Slider list kept for reference
   // const list: VideoItem[] = videos?.length ? videos : videoSrc ? [{ src: videoSrc, poster }] : [];
 
   return (
     <header className="bg-transparent pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
+      {/* Warm up the connection to Instagram so the embeds start sooner */}
+      <link rel="preconnect" href="https://www.instagram.com" />
+      <link
+        rel="preconnect"
+        href="https://static.cdninstagram.com"
+        crossOrigin=""
+      />
+
       <div className="mx-auto flex max-w-[1200px] flex-col items-center px-4 pt-2 text-center sm:px-8 sm:pt-8">
         {/* Logo */}
         <a
@@ -661,7 +768,7 @@ export default function Hero({ videoSrc, poster, videos }: HeroProps) {
         </a>
 
         {/* Coming Soon — handwriting animation */}
-        <ComingSoon />
+        <ComingSoon ready={loaderGone} />
 
         {/* Tagline */}
         <h1 className="mt-8 max-w-[18ch] text-[clamp(2.25rem,6.5vw,4.25rem)] font-extrabold leading-[1.08] tracking-tight text-stone-900 sm:mt-12">
