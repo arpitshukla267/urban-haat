@@ -3,10 +3,12 @@ import ImageCarousel from "@/components/ImageCarousel";
 import BookTicket from "@/components/Bookticket";
 import Footer from "@/components/Footer";
 import PageBackground from "@/components/PageBackground";
+import Loader from "@/components/Loader";
 
 export default function Home() {
   return (
     <main className="min-h-screen">
+      <Loader />
       <PageBackground />
       <Hero
         videos={[
@@ -18,7 +20,7 @@ export default function Home() {
         ]}
       />
       <BookTicket />
-      {/* <ImageCarousel /> */}
+      <ImageCarousel />
       <Footer />
     </main>
   );

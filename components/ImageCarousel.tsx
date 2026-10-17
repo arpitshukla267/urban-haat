@@ -4,14 +4,17 @@ import Image from "next/image";
 
 /* ------------------------------------------------------------------
    ADD YOUR IMAGES HERE
-   1. Put the image files in the /public/carousel folder
-   2. List them below, e.g. { src: "/carousel/1.jpg", alt: "Handloom stall" }
+   1. Put the image files in the /public/banners folder
+   2. List them below, e.g. { src: "/banners/1.webp", alt: "Handloom stall" }
    While the list is empty, tinted placeholder tiles are shown.
 ------------------------------------------------------------------- */
 const IMAGES: { src: string; alt: string }[] = [
-  // { src: "/carousel/1.jpg", alt: "Handloom stall" },
-  // { src: "/carousel/2.jpg", alt: "Street food counter" },
-  // { src: "/carousel/3.jpg", alt: "Handmade pottery" },
+  { src: "/banners/1.webp", alt: "Handloom stall" },
+  { src: "/banners/2.webp", alt: "Street food counter" },
+  { src: "/banners/3.webp", alt: "Handmade pottery" },
+  { src: "/banners/4.webp", alt: "Handloom stall" },
+  { src: "/banners/5.webp", alt: "Street food counter" },
+  { src: "/banners/6.png", alt: "Handmade pottery" },
 ];
 
 const PLACEHOLDERS = 8;
@@ -51,7 +54,7 @@ function Group({ items, hidden = false }: { items: Item[]; hidden?: boolean }) {
   );
 }
 
-export default function ImageCarousel() {
+export default function Imagebanners() {
   const base: Item[] = IMAGES.length
     ? IMAGES
     : Array.from({ length: PLACEHOLDERS }, (_, i) => ({ alt: `Placeholder ${i + 1}` }));

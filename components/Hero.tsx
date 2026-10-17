@@ -458,56 +458,187 @@ function ComingSoon() {
   );
 }
 
-/* ---------- Instagram Reel Video Component ---------- */
-function InstagramReelView() {
-  const containerRef = useRef<HTMLDivElement>(null);
+/* ---------- Instagram Reel Carousel Component ---------- */
+const REEL_IDS = [
+  "DeZGuqASYJU",
+  "DelWfMDKqrX",
+  "Dej_99rKRD7",
+  "DegiS-gq2wy",
+];
 
+function ReelCard({
+  id,
+  isActive,
+  onActivate,
+  scrollerRef,
+}: {
+  id: string;
+  isActive: boolean;
+  onActivate: () => void;
+  scrollerRef: React.RefObject<HTMLDivElement | null>;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const iframeRef = useRef<HTMLIFrameElement>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+
+  // If this card is no longer active, refresh the iframe to stop video playback
   useEffect(() => {
-    // Load Instagram embed script
-    if (
-      typeof window !== "undefined" &&
-      !document.getElementById("ig-embed-script")
-    ) {
-      const script = document.createElement("script");
-      script.id = "ig-embed-script";
-      script.src = "https://www.instagram.com/embed.js";
-      script.async = true;
-      document.body.appendChild(script);
-    } else if (
-      typeof window !== "undefined" &&
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).instgrm
-    ) {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      (window as any).instgrm.Embeds.process();
+    if (!isActive) {
+      setReloadKey((k) => k + 1);
     }
-  }, []);
+  }, [isActive]);
+
+  // When card moves out of the scroller viewport or page viewport, automatically pause it
+  useEffect(() => {
+    const cardEl = cardRef.current;
+    const scrollerEl = scrollerRef.current;
+    if (!cardEl || !isActive) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          // If less than 40% of the active video is visible in the carousel/viewport, pause it
+          if (entry.intersectionRatio < 0.4) {
+            setReloadKey((k) => k + 1);
+          }
+        });
+      },
+      {
+        root: scrollerEl,
+        threshold: [0, 0.4, 0.8, 1.0],
+      }
+    );
+
+    observer.observe(cardEl);
+    return () => observer.disconnect();
+  }, [isActive, scrollerRef]);
 
   return (
-    <div ref={containerRef} className="mx-auto w-full max-w-[400px]">
+    <div
+      ref={cardRef}
+      onClick={onActivate}
+      className="w-[85vw] max-w-[340px] flex-none snap-center sm:w-[320px] lg:w-[340px]"
+    >
       <div
-        className="relative w-full overflow-hidden rounded-2xl bg-black"
-        style={{
-          aspectRatio: "9 / 16",
-          boxShadow: "0 20px 50px -20px rgba(191,123,37,0.3)",
-        }}
+        className="relative w-full overflow-hidden rounded-2xl bg-black border border-[#BF7B25]/20 shadow-[0_20px_50px_-20px_rgba(191,123,37,0.3)]"
+        style={{ aspectRatio: "9 / 16" }}
       >
         <iframe
-          src="https://www.instagram.com/reel/DeZGuqASYJU/embed"
-          title="Instagram reel"
+          key={reloadKey}
+          ref={iframeRef}
+          src={`https://www.instagram.com/reel/${id}/embed`}
+          title={`Instagram reel ${id}`}
           loading="lazy"
           allow="autoplay; encrypted-media; fullscreen"
           scrolling="no"
           className="absolute border-0"
           style={{
-            width: 500, // Instagram embed ki original width
+            width: 450,
             height: 920,
-            left: -86, // side ke black bars cut karne ke liye
-            top: -64, // upar ka header cut
-            transform: "scale(1.146)", // video ko container width (400px) tak failane ke liye
+            left: -86,
+            top: -64,
+            transform: "scale(1.146)",
             transformOrigin: "top left",
           }}
         />
+      </div>
+    </div>
+  );
+}
+
+function InstagramReelCarousel() {
+  const scrollerRef = useRef<HTMLDivElement>(null);
+  const [activeReelId, setActiveReelId] = useState<string | null>(null);
+  const [canScrollLeft, setCanScrollLeft] = useState(false);
+  const [canScrollRight, setCanScrollRight] = useState(true);
+
+  const checkScroll = useCallback(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    setCanScrollLeft(el.scrollLeft > 10);
+    setCanScrollRight(el.scrollLeft < el.scrollWidth - el.clientWidth - 10);
+  }, []);
+
+  useEffect(() => {
+    checkScroll();
+    window.addEventListener("resize", checkScroll);
+    return () => window.removeEventListener("resize", checkScroll);
+  }, [checkScroll]);
+
+  // When window/page loses focus to an iframe, identify which reel was interacted with
+  useEffect(() => {
+    const onBlur = () => {
+      // Small timeout to check which element became active
+      setTimeout(() => {
+        const activeEl = document.activeElement;
+        if (activeEl && activeEl.tagName === "IFRAME") {
+          const src = (activeEl as HTMLIFrameElement).src || "";
+          for (const id of REEL_IDS) {
+            if (src.includes(id)) {
+              setActiveReelId(id);
+              break;
+            }
+          }
+        }
+      }, 50);
+    };
+
+    window.addEventListener("blur", onBlur);
+    return () => window.removeEventListener("blur", onBlur);
+  }, []);
+
+  const scroll = (direction: "left" | "right") => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const distance = 350;
+    el.scrollBy({
+      left: direction === "left" ? -distance : distance,
+      behavior: "smooth",
+    });
+  };
+
+  return (
+    <div className="relative w-full max-w-[1200px] px-2 sm:px-8">
+      {/* Scroll Left Button */}
+      {canScrollLeft && (
+        <button
+          type="button"
+          onClick={() => scroll("left")}
+          aria-label="Previous reel"
+          className="absolute left-0 sm:left-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/95 text-[#BF7B25] shadow-lg backdrop-blur transition hover:bg-[#BF7B25] hover:text-white"
+        >
+          <Chevron dir="left" />
+        </button>
+      )}
+
+      {/* Scroll Right Button */}
+      {canScrollRight && (
+        <button
+          type="button"
+          onClick={() => scroll("right")}
+          aria-label="Next reel"
+          className="absolute right-0 sm:right-2 top-1/2 z-20 grid size-11 -translate-y-1/2 place-items-center rounded-full border border-[#BF7B25]/30 bg-white/95 text-[#BF7B25] shadow-lg backdrop-blur transition hover:bg-[#BF7B25] hover:text-white"
+        >
+          <Chevron dir="right" />
+        </button>
+      )}
+
+      {/* Carousel Track */}
+      <div
+        ref={scrollerRef}
+        onScroll={checkScroll}
+        className="flex snap-x snap-mandatory gap-5 sm:gap-6 overflow-x-auto overscroll-x-contain py-4 px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+        style={{ WebkitOverflowScrolling: "touch" }}
+      >
+        {REEL_IDS.map((id) => (
+          <ReelCard
+            key={id}
+            id={id}
+            isActive={activeReelId === null || activeReelId === id}
+            onActivate={() => setActiveReelId(id)}
+            scrollerRef={scrollerRef}
+          />
+        ))}
       </div>
     </div>
   );
@@ -519,7 +650,7 @@ export default function Hero({ videoSrc, poster, videos }: HeroProps) {
 
   return (
     <header className="bg-transparent pt-[max(1.5rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))]">
-      <div className="mx-auto flex max-w-[1100px] flex-col items-center px-4 pt-2 text-center sm:px-8 sm:pt-8">
+      <div className="mx-auto flex max-w-[1200px] flex-col items-center px-4 pt-2 text-center sm:px-8 sm:pt-8">
         {/* Logo */}
         <a
           href="#"
@@ -541,11 +672,9 @@ export default function Hero({ videoSrc, poster, videos }: HeroProps) {
           from the people who make them.
         </p>
 
-        {/* Video section - Instagram Reel in center */}
+        {/* Video section - Instagram Reels Carousel */}
         <div className="mt-10 flex w-full justify-center sm:mt-14">
-          <InstagramReelView />
-          {/* VideoSlider with placeholders, dots, and arrows commented out for now: */}
-          {/* <VideoSlider videos={list} /> */}
+          <InstagramReelCarousel />
         </div>
       </div>
 
