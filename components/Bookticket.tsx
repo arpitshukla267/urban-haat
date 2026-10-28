@@ -172,7 +172,7 @@ function WhatsAppIcon({ className = "size-5" }: { className?: string }) {
 
 const CW = 1148;
 const CH = 1370;
-const COUPON_BG = "/ticket.webp";
+const COUPON_BG = "/ticket.jpg";
 
 const fieldText: React.CSSProperties = {
   position: "absolute",
