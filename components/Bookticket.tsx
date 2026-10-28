@@ -252,7 +252,7 @@ function CouponCanvas({ ticket }: { ticket: Ticket }) {
           position: "absolute",
           left: 0,
           right: 0,
-          top: 1318,
+          top: 1333,
           textAlign: "center",
           fontSize: 22,
           color: "#8F5512",
