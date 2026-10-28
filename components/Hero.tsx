@@ -401,8 +401,8 @@ function ComingSoon({ ready }: { ready: boolean }) {
     const el = rootRef.current;
     if (!el) return;
     if (typeof IntersectionObserver === "undefined") {
-      setPhase((p) => (p === 0 ? 1 : p));
-      return;
+      const raf = requestAnimationFrame(() => setPhase((p) => (p === 0 ? 1 : p)));
+      return () => cancelAnimationFrame(raf);
     }
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -446,16 +446,6 @@ function ComingSoon({ ready }: { ready: boolean }) {
         onDone={() => setPhase(2)}
         className="text-[clamp(2.75rem,9vw,5rem)] font-bold leading-none text-[#BF7B25]"
       />
-
-      {/* This Navratri: starts the moment "Coming Soon" finishes */}
-      {/* <div className="mt-2">
-        <WriteLine
-          text="This Navratri"
-          run={phase >= 2}
-          duration={0.9}
-          className="text-[clamp(1.75rem,5vw,2.75rem)] font-semibold leading-tight text-stone-800"
-        />
-      </div> */}
     </div>
   );
 }

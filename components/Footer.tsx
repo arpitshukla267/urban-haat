@@ -1,5 +1,6 @@
 "use client";
 import Image from "next/image";
+import Link from "next/link";
 
 const INSTAGRAM_URL = "https://www.instagram.com/urbanhaat_jhansi/"; 
 const WHATSAPP_NUMBER = "919236553585"; 
@@ -45,7 +46,7 @@ export default function Footer() {
         </div>
 
         {/* Links row for mobile / separate columns on desktop */}
-        <div className="flex flex-row items-start justify-between gap-8 sm:gap-12 md:contents">
+        <div className="flex flex-row flex-wrap items-start justify-between gap-8 sm:gap-12 md:contents">
           {/* Quick link */}
           <div>
             <p className="text-lg font-bold text-gray-900">Follow us</p>
@@ -59,6 +60,19 @@ export default function Footer() {
               >
                 <InstagramIcon />
               </a>
+            </div>
+          </div>
+
+          {/* Legal / Policy */}
+          <div>
+            <p className="text-lg font-bold text-gray-900">Quick Links</p>
+            <div className="mt-3">
+              <Link
+                href="/terms"
+                className="inline-block text-sm font-semibold text-stone-700 hover:text-[#9A5F18] transition hover:underline"
+              >
+                Terms & Conditions
+              </Link>
             </div>
           </div>
 
@@ -82,8 +96,16 @@ export default function Footer() {
 
       {/* Bottom bar */}
       <div className="bg-[#9A5F18] pb-[env(safe-area-inset-bottom)]">
-        <div className="mx-auto flex max-w-[1100px] flex-col items-center justify-center gap-1 px-4 py-4 text-sm text-[#ffffff] sm:flex-row sm:px-8">
+        <div className="mx-auto flex max-w-[1100px] flex-col items-center justify-between gap-2 px-4 py-4 text-sm text-[#ffffff] sm:flex-row sm:px-8">
           <p>© 2026 Urban Haat. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link
+              href="/terms"
+              className="text-amber-100 hover:text-white transition hover:underline"
+            >
+              Terms & Conditions
+            </Link>
+          </div>
         </div>
       </div>
     </footer>

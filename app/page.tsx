@@ -1,3 +1,4 @@
+import CountdownTimer from "@/components/CountdownTimer";
 import Hero from "@/components/Hero";
 import ImageCarousel from "@/components/ImageCarousel";
 import BookTicket from "@/components/Bookticket";
@@ -12,6 +13,7 @@ export default function Home() {
       <main className="min-h-screen">
         <Loader />
         <PageBackground />
+        <CountdownTimer />
         <Hero/>
         <BookTicket />
         <ImageCarousel />
