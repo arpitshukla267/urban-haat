@@ -14,7 +14,7 @@ const IMAGES: { src: string; alt: string }[] = [
   { src: "/banners/2.webp", alt: "Street food counter" },
   { src: "/banners/3.webp", alt: "Handmade pottery" },
   { src: "/banners/4.webp", alt: "Handloom stall" },
-  { src: "/banners/5.webp", alt: "Street food counter" },
+  // { src: "/banners/5.webp", alt: "Street food counter" },
   { src: "/banners/6.png", alt: "Handmade pottery" },
 ];
 

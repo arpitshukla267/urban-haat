@@ -13,7 +13,7 @@ export default function Home() {
       <main className="min-h-screen">
         <Loader />
         <PageBackground />
-        <CountdownTimer />
+        {/* <CountdownTimer /> */}
         <Hero/>
         <BookTicket />
         <ImageCarousel />
