@@ -1,0 +1,36 @@
+
+name: Deploy Urban Haat
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: urban-haat-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to Hostinger VPS
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -e
+            cd /var/www/urban-haat
+            git fetch origin main
+            git reset --hard origin/main
+            npm ci
+            npm run build
+            pm2 restart urban-haat-test --update-env
+            sleep 3
+            curl -fsS http://127.0.0.1:3001/ > /dev/null
+            echo "Urban Haat deployment successful"
