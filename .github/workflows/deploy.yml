@@ -1,11 +1,19 @@
 
-name: Deploy Urban Haat
+name: Urban Haat - Production CI/CD
 
 on:
   push:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      action:
+        description: Select deployment action
+        required: true
+        type: choice
+        options:
+          - deploy
+          - rollback
 
 concurrency:
   group: urban-haat-production
@@ -13,10 +21,11 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name == 'push' || inputs.action == 'deploy'
     runs-on: ubuntu-latest
 
     steps:
-      - name: Deploy to Hostinger VPS
+      - name: Blue Green Deployment
         uses: appleboy/ssh-action@v1.2.0
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -24,13 +33,139 @@ jobs:
           key: ${{ secrets.SSH_PRIVATE_KEY }}
           port: 22
           script: |
-            set -e
-            cd /var/www/urban-haat
-            git fetch origin main
-            git reset --hard origin/main
+            set -Eeuo pipefail
+
+            BASE=/var/www/urban-haat-releases
+            NGINX=/etc/nginx/sites-available/urban-haat
+            SHA=${{ github.sha }}
+            RELEASE="$BASE/$SHA"
+            STATE="$BASE/deployment-state"
+
+            ACTIVE_PORT=$(grep -oP 'proxy_pass http://127.0.0.1:\K[0-9]+' "$NGINX" | head -1)
+
+            if [ "$ACTIVE_PORT" = "3001" ]; then
+              TARGET_PORT=3002
+            elif [ "$ACTIVE_PORT" = "3002" ]; then
+              TARGET_PORT=3001
+            else
+              echo "Unexpected active port"
+              exit 1
+            fi
+
+            OLD_RELEASE=$(cat "$BASE/port-$TARGET_PORT.release")
+            OLD_APP=$(cat "$BASE/port-$TARGET_PORT.app")
+            APP_NAME="urban-haat-$SHA"
+
+            if [ "$SHA" = "$(cat "$STATE")" ]; then
+              echo "This commit is already live."
+              exit 0
+            fi
+
+            switched=false
+
+            rollback() {
+              echo "Deployment failed. Restoring previous state."
+
+              if [ "$switched" = true ]; then
+                sed -i "s/127.0.0.1:$TARGET_PORT/127.0.0.1:$ACTIVE_PORT/" "$NGINX"
+                sudo /usr/sbin/nginx -t
+                sudo /usr/bin/systemctl reload nginx
+              fi
+
+              pm2 delete "$APP_NAME" 2>/dev/null || true
+
+              cd "$OLD_RELEASE"
+              PORT=$TARGET_PORT pm2 start npm --name "$OLD_APP" -- start -- -p "$TARGET_PORT"
+
+              pm2 save
+              exit 1
+            }
+
+            trap rollback ERR
+
+            mkdir -p "$BASE"
+
+            if [ ! -d "$RELEASE" ]; then
+              git clone https://github.com/${{ github.repository }}.git "$RELEASE"
+              cd "$RELEASE"
+              git checkout "$SHA"
+            fi
+
+            cd "$RELEASE"
+            ln -sfn "$BASE/shared/.env.local" .env.local
+
             npm ci
             npm run build
-            pm2 restart urban-haat-test --update-env
-            sleep 3
-            curl -fsS http://127.0.0.1:3001/ > /dev/null
-            echo "Urban Haat deployment successful"
+
+            # Replace only the inactive port's old process.
+            pm2 delete "$OLD_APP" 2>/dev/null || true
+
+            PORT=$TARGET_PORT pm2 start npm --name "$APP_NAME" -- start -- -p "$TARGET_PORT"
+
+            sleep 5
+            curl -fsS --max-time 15 "http://127.0.0.1:$TARGET_PORT/" > /dev/null
+
+            sed -i "s/127.0.0.1:$ACTIVE_PORT/127.0.0.1:$TARGET_PORT/" "$NGINX"
+            sudo /usr/sbin/nginx -t
+
+            switched=true
+            sudo /usr/bin/systemctl reload nginx
+
+            curl -fsS --max-time 15 https://urbanhaat.shop/ > /dev/null
+
+            echo "$RELEASE" > "$BASE/port-$TARGET_PORT.release"
+            echo "$APP_NAME" > "$BASE/port-$TARGET_PORT.app"
+            echo "$RELEASE" > "$STATE"
+
+            pm2 save
+            trap - ERR
+
+            echo "Deployment successful: $SHA"
+
+  rollback:
+    if: github.event_name == 'workflow_dispatch' && inputs.action == 'rollback'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Restore previous release
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_PRIVATE_KEY }}
+          port: 22
+          script: |
+            set -euo pipefail
+
+            BASE=/var/www/urban-haat-releases
+            NGINX=/etc/nginx/sites-available/urban-haat
+
+            ACTIVE_PORT=$(grep -oP 'proxy_pass http://127.0.0.1:\K[0-9]+' "$NGINX" | head -1)
+
+            if [ "$ACTIVE_PORT" = "3001" ]; then
+              TARGET_PORT=3002
+            else
+              TARGET_PORT=3001
+            fi
+
+            curl -fsS --max-time 15 "http://127.0.0.1:$TARGET_PORT/" > /dev/null
+
+            cp "$NGINX" "$NGINX.rollback-backup"
+
+            sed -i "s/127.0.0.1:$ACTIVE_PORT/127.0.0.1:$TARGET_PORT/" "$NGINX"
+
+            if ! sudo /usr/sbin/nginx -t; then
+              cp "$NGINX.rollback-backup" "$NGINX"
+              exit 1
+            fi
+
+            sudo /usr/bin/systemctl reload nginx
+
+            if ! curl -fsS --max-time 15 https://urbanhaat.shop/ > /dev/null; then
+              cp "$NGINX.rollback-backup" "$NGINX"
+              sudo /usr/sbin/nginx -t
+              sudo /usr/bin/systemctl reload nginx
+              exit 1
+            fi
+
+            echo "Rollback successful. Active port: $TARGET_PORT"
